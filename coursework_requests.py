@@ -8,7 +8,7 @@ class TokenForApi:
 
     URL = 'https://api.vk.com/method/'
 
-    def __init__(self, version='5.135'):
+    def __init__(self, version='5.194'):
         with open('token_vk.txt') as file, open('token_yandex.txt') as f:
             self.token_vk = file.readline()
             self.token_yandex = f.readline()
@@ -23,6 +23,8 @@ class TokenForApi:
 
     def get_photos_to_vk(self, id=None):
         count = 0
+        my_list = []
+        index = 'smxopqryzw'
         url = TokenForApi.URL + 'photos.getAll?'
         parameters = {
             'owner_id': id ,
@@ -35,12 +37,30 @@ class TokenForApi:
             response = requests.get(url, params={
                 **self.params_vk, **parameters}).json()
             time.sleep(0.4)
-            count += response['response']['count']
-            if response['response']['count'] == 200:
+            if 'error' in response:
+                print(
+                    '\nВнимание!!! Ошибка запроса: ', 
+                    response['error']['error_msg'], end='\n\n')
+            for i in response['response']['items']:
+                my_list.append({
+                    'size': i['sizes'][-1]['type'], 
+                    'photo': {
+                        'likes': i['likes']['count'],
+                        'url': i['sizes'][-1]['url']}})
+                count += 1
+            if count == 200:
                 parameters['offset'] += 200
+                count = 0
             else:
                 break
-        return response
+        # for i in response['response']['items']:
+        #     if len(my_list) == 0:
+        #         my_list.append({'size': i['sizes'][-1], 'likes': i['likes']['count']})
+        #     else:
+        #         if i['sizes'][-1]['type']
+        # pprint.pprint(len(my_list))
+        pprint.pprint(my_list)
+        return my_list
 
     def save_photos_to_yandex(self, file_path: str):
 
@@ -73,7 +93,7 @@ if __name__ == '__main__':
     id_user = 33579332
     # id_user = 1105788
     my_token = TokenForApi()
-    # object = my_token.get_photos_to_vk(id_user)
+    object = my_token.get_photos_to_vk(id_user)
     # pprint.pprint(object)
     # my_token.save_photos_to_yandex('31.jpg')
     
