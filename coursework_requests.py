@@ -3,7 +3,6 @@ import pprint
 import time
 
 
-
 class TokenForApi:
 
     URL = 'https://api.vk.com/method/'
@@ -53,29 +52,23 @@ class TokenForApi:
                 count = 0
             else:
                 break
-        # for i in response['response']['items']:
-        #     if len(my_list) == 0:
-        #         my_list.append({'size': i['sizes'][-1], 'likes': i['likes']['count']})
-        #     else:
-        #         if i['sizes'][-1]['type']
-        # pprint.pprint(len(my_list))
-        pprint.pprint(my_list)
+        # pprint.pprint(my_list)
         return my_list
 
-    def save_photos_to_yandex(self, file_path: str):
+    def save_photos_to_yandex(self, object, number=5):
 
         url = 'https://cloud-api.yandex.net/v1/disk/resources/upload'
         name_folder = self.create_folder()
-        name_path = name_folder + '/' + file_path
-        parameters = {'path': name_path, 'overwrite': 'true'}
-        print(parameters)
 
-        response = requests.get(
-            url, headers=self.headers_yandex, params=parameters).json()
-        print(response)
-        with open(file_path, 'rb') as file:
+        for element in object:
+            name_file = element['photo']['url'].split('/')[-1]
+            name_path = name_folder + '/' + name_file
+            parameters = {'path': name_path, 'overwrite': 'true'}
+
+            response = requests.get(
+                url, headers=self.headers_yandex, params=parameters).json()
             response = requests.put(
-                response['href'], files={'file': file}, 
+                response['href'], files={'file': element['photo']['url']}, 
                 headers=self.headers_yandex, params=parameters)
 
     def create_folder(self):
@@ -95,5 +88,5 @@ if __name__ == '__main__':
     my_token = TokenForApi()
     object = my_token.get_photos_to_vk(id_user)
     # pprint.pprint(object)
-    # my_token.save_photos_to_yandex('31.jpg')
+    my_token.save_photos_to_yandex(object)
     
