@@ -23,7 +23,6 @@ class TokenForApi:
     def get_photos_to_vk(self, id=None):
         count = 0
         my_list = []
-        index = 'smxopqryzw'
         url = TokenForApi.URL + 'photos.getAll?'
         parameters = {
             'owner_id': id ,
@@ -67,8 +66,16 @@ class TokenForApi:
 
             response = requests.get(
                 url, headers=self.headers_yandex, params=parameters).json()
+            p = requests.get(element['photo']['url'])
+            print(p)
+            # out = open(response['href'], "wb")
+            # out.write(p.content)
+            # out.close()
+            # files = {'files': open(element["photo"]["url"], 'rb')}
             response = requests.put(
-                response['href'], files={'file': element['photo']['url']}, 
+                # response['href'], files=p.content,
+                # files = {'media': open('test.jpg', 'rb')}
+                response['href'], files={'file': p.content}, 
                 headers=self.headers_yandex, params=parameters)
 
     def create_folder(self):
