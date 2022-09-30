@@ -7,10 +7,11 @@ class TokenForApi:
 
     URL = 'https://api.vk.com/method/'
 
-    def __init__(self, token, version='5.194'):
+    def __init__(self, token, version='5.194', number=5):
         with open('token_vk.txt') as file:
             self.token_vk = file.readline()
         self.token_yandex = token
+        self.number = number
 
         self.params_vk = {
             'access_token': self.token_vk,
@@ -21,8 +22,6 @@ class TokenForApi:
             'Authorization': f'OAuth {self.token_yandex}'}
 
     def get_photos_to_vk(self, id=None):
-        count = 0
-        my_list = []
         url = TokenForApi.URL + 'photos.getAll?'
         parameters = {
             'owner_id': id ,
@@ -41,41 +40,53 @@ class TokenForApi:
                     '\nВнимание!!! Ошибка запроса: ', 
                     response['error']['error_msg'], end='\n\n')
 
-            for i in response['response']['items']:
+            my_list = self._add_photo_to_list(response) 
+
+            if len(my_list) == 200:
+                parameters['offset'] += 200
+            else:
+                break
+        pprint.pprint(my_list)
+        return my_list
+
+    def _add_photo_to_list(self, response):
+        my_list = []
+        count = 0
+        for i in response['response']['items']:
+                name_file = i['sizes'][-1]['url'].split('/')[-1].split('?')[0]
+                index = name_file.find('.')
+                name_file = name_file[index:]
+                name_file = f'{i["likes"]["count"]}{name_file}'
+
                 my_list.append({
                     'size': i['sizes'][-1]['type'], 
+                    'file_name': name_file,
                     'photo': {
                         'likes': i['likes']['count'],
                         'url': i['sizes'][-1]['url']}})
                 count += 1
-
-            if count == 200:
-                parameters['offset'] += 200
-                count = 0
-            else:
-                break
-        # pprint.pprint(my_list)
+                
+                if self.number == 'all':
+                    pass
+                elif count == self.number:
+                    break
         return my_list
 
-    def _add_photo_to_list():
-        pass
-
-    def save_photos_to_yandex(self, object, number=5):
+    def save_photos_to_yandex(self, object_list):
 
         url = 'https://cloud-api.yandex.net/v1/disk/resources/upload'
         name_folder = self.create_folder()
 
-        for element in object:
-            name_file = element['photo']['url'].split('/')[-1]
-            name_path = name_folder + '/' + name_file
-            parameters = {'path': name_path, 'overwrite': 'true'}
+        for element in object_list:
+            # name_file = element['photo']['url'].split('/')[-1]
+            # name_path = name_folder + '/' + name_file
+            name_path = name_folder + '/' + element['file_name']
+            parameters = {'path': name_path, 'overwrite': 'true', 'templated': True}
 
             response = requests.get(
                 url, headers=self.headers_yandex, params=parameters).json()
-            p = requests.get(element['photo']['url'])
-            print(p)
             response = requests.put(
-                response['href'], files={'file': p.content}, 
+                response['href'], files={'file': element['photo']['url']}, 
                 headers=self.headers_yandex, params=parameters)
 
     def create_folder(self):
@@ -102,7 +113,7 @@ def input_id_and_token():
 
 if __name__ == '__main__':
     id_user, token_yandex = input_id_and_token()
-    my_token = TokenForApi(token_yandex)
+    my_token = TokenForApi(token_yandex, number=3)
     object = my_token.get_photos_to_vk(id_user)
     # pprint.pprint(object)
     my_token.save_photos_to_yandex(object)
