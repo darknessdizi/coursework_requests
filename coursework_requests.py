@@ -37,6 +37,14 @@ class TokenForApi:
             'Content-Type': 'application/json',
             'Authorization': f'OAuth {self.token_yandex}'}
 
+    def __str__(self):
+        my_str = '[{\n'
+        for i in self.final_list:
+            my_str += f'"file_name": "{i["file_name"]}",\n'
+            my_str += f'"size": "{i["size"]}"\n'
+        my_str += '}]\n'
+        return my_str
+
     def get_photos_to_vk(self, id=None):
 
         '''Метод на вход получает номер ID пользователя (по умолчанию
@@ -77,7 +85,6 @@ class TokenForApi:
                     break
             elif len(self.final_list) % 200 == 0:
                 parameters['offset'] += 200
-        pprint.pprint(len(self.final_list))
 
     def _add_photo_to_list(self, response, list_name):
 
@@ -176,8 +183,8 @@ def input_id_and_token():
     id_user = input("Введите ID пользователя: ")
     if id_user == '':
         id_user = None
-        # id_user = 1105788
-        # id_user = 2726270
+        id_user = 1105788
+        id_user = 2726270
     token_yandex = input("Введите token с полигона Yandex: ")
     if token_yandex == '':
         with open('token_yandex.txt') as file:
@@ -186,7 +193,8 @@ def input_id_and_token():
 
 if __name__ == '__main__':
     id_user, token_yandex = input_id_and_token()
-    object = TokenForApi(token_yandex, 'all')
+    object = TokenForApi(token_yandex, 10)
     object.get_photos_to_vk(id_user)
     object.save_photos_to_yandex(object.final_list)
+    print(object)
     
