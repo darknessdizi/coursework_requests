@@ -1,6 +1,6 @@
 import requests
-import pprint
 import time
+from alive_progress import alive_bar
 
 
 class TokenForApi:
@@ -68,6 +68,7 @@ class TokenForApi:
             'photo_sizes': 1}
         list_name = []
 
+        
         while True:
             response = requests.get(url, params={
                 **self.params_vk, **parameters}).json()
@@ -77,12 +78,13 @@ class TokenForApi:
                     '\nВнимание!!! Ошибка запроса Api VK: ', 
                     response['error']['error_msg'], end='\n\n')
 
+            
             list_name = self._add_photo_to_list(response, list_name) 
 
             if len(self.final_list) == response['response']['count']:
                 break
             elif len(self.final_list) == self.number:
-                    break
+                break
             elif len(self.final_list) % 200 == 0:
                 parameters['offset'] += 200
 
@@ -99,8 +101,9 @@ class TokenForApi:
         в словарь и добавляются в поле класса final_list. 
 
         '''
-
-        for i in response['response']['items']:
+        print("Получение списка фотографий:")
+        with alive_bar(len(response['response']['items']), force_tty=True) as bar:
+            for i in response['response']['items']:
                 name_file = i['sizes'][-1]['url'].split('/')[-1].split('?')[0]
                 index = name_file.find('.')
                 name_file = name_file[index:]
@@ -126,6 +129,7 @@ class TokenForApi:
                                 'likes': i['likes']['count'],
                                 'url': i['sizes'][-1]['url']}})
                         list_name.append(name_file)
+                        bar()
                         break
     
                 if len(self.final_list) == self.number:
@@ -144,15 +148,18 @@ class TokenForApi:
         url = 'https://cloud-api.yandex.net/v1/disk/resources/upload'
         name_folder = self.create_folder()
 
-        for element in object_list:
-            name_path = name_folder + '/' + element['file_name']
-            parameters = {'path': name_path, 'overwrite': 'true'}
+        print("Загрузка фотографий на Yandex:")
+        with alive_bar(len(object_list), force_tty=True) as bar:
+            for element in object_list:
+                name_path = name_folder + '/' + element['file_name']
+                parameters = {'path': name_path, 'overwrite': 'true'}
 
-            response = requests.get(
-                url, headers=self.headers_yandex, params=parameters).json()
-            response = requests.put(
-                response['href'], files={'file': element['photo']['url']}, 
-                headers=self.headers_yandex, params=parameters)
+                response = requests.get(
+                    url, headers=self.headers_yandex, params=parameters).json()
+                response = requests.put(
+                    response['href'], files={'file': element['photo']['url']}, 
+                    headers=self.headers_yandex, params=parameters)
+                bar()
 
     def create_folder(self):
 
@@ -182,8 +189,8 @@ def input_id_and_token():
 
     id_user = input("Введите ID пользователя: ")
     if id_user == '':
-        id_user = None
-        id_user = 1105788
+        # id_user = None
+        # id_user = 1105788
         id_user = 2726270
     token_yandex = input("Введите token с полигона Yandex: ")
     if token_yandex == '':
@@ -193,8 +200,8 @@ def input_id_and_token():
 
 if __name__ == '__main__':
     id_user, token_yandex = input_id_and_token()
-    object = TokenForApi(token_yandex, 10)
+    object = TokenForApi(token_yandex, 'all')
     object.get_photos_to_vk(id_user)
     object.save_photos_to_yandex(object.final_list)
-    print(object)
+    print("\n Список файлов:\n", object)
     
