@@ -1,6 +1,7 @@
 import requests
 import time
 from alive_progress import alive_bar
+import pprint
 
 
 class TokenForApi:
@@ -44,7 +45,7 @@ class TokenForApi:
         my_str += '}]\n'
         return my_str
 
-    def get_photos_to_vk(self, id=None):
+    def get_all_photos(self, id=None):
 
         '''Метод на вход получает номер ID пользователя (по умолчанию
         
@@ -128,16 +129,102 @@ class TokenForApi:
                     self.final_list.append({
                         'size': i['sizes'][-1]['type'], 
                         'file_name': name_file,
-                        'photo': {
-                            'likes': i['likes']['count'],
-                            'url': i['sizes'][-1]['url']}})
+                        'likes': i['likes']['count'],
+                        'url': i['sizes'][-1]['url']})
                     list_name.append(name_file)
                     break
             if len(self.final_list) == self.number:
                     break
         return list_name
 
-    def save_photos_to_yandex(self, object_list):
+    def get_list_albums(self, id=None):
+
+        '''На вход получает id пользователя. Возвращает список
+        
+        альбомов, содержащий id альбома и его размер.
+        
+        '''
+
+        url = TokenForApi.URL + 'photos.getAlbums?'
+        parameters = {'owner_id': id}  
+        list_albums = []  
+
+        response = requests.get(url, params={
+            **self.params_vk, **parameters}).json()
+        time.sleep(0.33)
+
+        for element in response['response']['items']:
+            new_dict = {}
+            new_dict['id'] = element['id']
+            new_dict['size'] = element['size']
+            list_albums.append(new_dict)
+        return list_albums
+
+    def get_photos(self, id, id_album, count=5):
+        
+        '''На вход получает id пользователя, id альбома, количество
+        
+        фотографий (по умолчанию 5). Возвращает список фотографий 
+        
+        из альбома.
+        
+        '''
+
+        url = TokenForApi.URL + 'photos.get?'
+        parameters = {
+            'owner_id': id,
+            'album_id': id_album,
+            'extended': 1,
+            'photo_sizes': 1,
+            'count': count}  
+        list_photos = []
+        list_name = [] 
+
+        response = requests.get(url, params={
+            **self.params_vk, **parameters}).json()
+        time.sleep(0.33)
+
+        for element in response['response']['items']:
+            new_dict = {}
+            for i in element['sizes']:
+                if i['width'] and i['height'] != 0:
+                    sizes = i['width'] / i['height']
+                    if 'int_sizes' in new_dict:
+                        if sizes > new_dict['int_sizes']:
+                            new_dict['album_id'] = element['album_id']
+                            new_dict['int_sizes'] = sizes
+                            new_dict['file_name'] = self.create_name_file(
+                                element['likes']['count'], i['url']
+                                )
+                            new_dict['sizes'] = i['type']
+                            new_dict['url'] = i['url']
+                    else:
+                        new_dict['album_id'] = element['album_id']
+                        new_dict['int_sizes'] = sizes
+                        new_dict['file_name'] = self.create_name_file(
+                                element['likes']['count'], i['url']
+                                )
+                        new_dict['sizes'] = i['type']
+                        new_dict['url'] = i['url']
+                    del new_dict['int_sizes']
+                else:
+                    new_dict['album_id'] = element['album_id']
+                    new_dict['file_name'] = self.create_name_file(
+                        element['likes']['count'], i['url']
+                        )
+                    new_dict['sizes'] = i['type']
+                    new_dict['url'] = i['url']
+            list_photos.append(new_dict)
+        return list_photos
+
+    def create_name_file(self, likes, url):
+        name_file = url.split('/')[-1].split('?')[0]
+        index = name_file.find('.')
+        name_file = name_file[index:]
+        name_file = str(likes) + name_file
+        return name_file
+
+    def save_photos_to_yandex(self, list_objects):
 
         '''Метод принимает список словарей с данными на фотографии.
         
@@ -151,8 +238,8 @@ class TokenForApi:
         name_folder = self.create_folder()
 
         print("Загрузка фотографий на Yandex:")
-        with alive_bar(len(object_list), force_tty=True, dual_line=True) as bar:
-            for element in object_list:
+        with alive_bar(len(list_objects), force_tty=True, dual_line=True) as bar:
+            for element in list_objects:
                 name_path = name_folder + '/' + element['file_name']
                 parameters = {'path': name_path, 'overwrite': 'true'}
                 bar.text = f'Download {name_path}, please wait ...'
@@ -160,7 +247,7 @@ class TokenForApi:
                 response = requests.get(
                     url, headers=self.headers_yandex, params=parameters).json()
                 response = requests.put(
-                    response['href'], files={'file': element['photo']['url']}, 
+                    response['href'], files={'file': element['url']}, 
                     headers=self.headers_yandex, params=parameters)
                 bar()
 
@@ -203,8 +290,13 @@ def input_id_and_token():
 
 if __name__ == '__main__':
     id_user, token_yandex = input_id_and_token()
-    object = TokenForApi(token_yandex, 566)
-    object.get_photos_to_vk(id_user)
+    object = TokenForApi(token_yandex, 456)
+    object.get_all_photos(id_user)
     object.save_photos_to_yandex(object.final_list)
     # print("\n Список файлов:\n", object)
+    # obj_1 = object.get_list_albums(id_user)
+    # pprint.pprint(obj_1)
+    # obj_2 = object.get_photos(id_user, 275293270, 56)
+    # pprint.pprint(obj_2)
+    # object.save_photos_to_yandex(obj_2)
     
