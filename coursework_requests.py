@@ -78,7 +78,6 @@ class TokenForApi:
                     '\nВнимание!!! Ошибка запроса Api VK: ', 
                     response['error']['error_msg'], end='\n\n')
 
-            
             list_name = self._add_photo_to_list(response, list_name) 
 
             if len(self.final_list) == response['response']['count']:
