@@ -1,5 +1,3 @@
-import numbers
-from pprint import pprint
 import requests
 import time
 from alive_progress import alive_bar
@@ -17,9 +15,7 @@ class TokenForApi:
         
         Yandex, версию Api для VK (по умолчанию версия 5.194) и 
 
-        количество фотографий для загрузки (может принимать значения
-        
-        количество, строка 'all' или по умолчанию 5). Конструктор
+        количество фотографий для загрузки (по умолчанию 5). Конструктор
 
         считывает токен для Api VK из файла token_vk.txt.
         
@@ -71,31 +67,30 @@ class TokenForApi:
             'photo_sizes': 1}
         list_name = []
 
-        while True:
-            # tic = time.perf_counter()
+        items = int(self.number_for_bur / 200)
+        if self.number_for_bur % 200 != 0:
+            items += 1
+        print("Получение списка фотографий:")
+        with alive_bar(items, force_tty=True) as bar:
+            while True:                 
+                response = requests.get(url, params={
+                    **self.params_vk, **parameters}).json()
+                time.sleep(0.33)
+        
+                if 'error' in response:
+                    print(
+                        '\nВнимание!!! Ошибка запроса Api VK: ', 
+                        response['error']['error_msg'], end='\n\n')
 
-            response = requests.get(url, params={
-                **self.params_vk, **parameters}).json()
-            time.sleep(0.33)
-            if 'error' in response:
-                print(
-                    '\nВнимание!!! Ошибка запроса Api VK: ', 
-                    response['error']['error_msg'], end='\n\n')
+                list_name = self._add_photo_to_list(response, list_name) 
+                bar()
 
-            if self.number_for_bur == 'all':
-                self.number_for_bur = response['response']['count']
-
-            # toc = time.perf_counter()
-            # print(f"Вычисление заняло {toc - tic:0.4f} секунд")
-
-            list_name = self._add_photo_to_list(response, list_name) 
-
-            if len(self.final_list) == response['response']['count']:
-                break
-            elif len(self.final_list) == self.number:
-                break
-            elif len(self.final_list) % 200 == 0:
-                parameters['offset'] += 200
+                if len(self.final_list) == response['response']['count']:
+                    break
+                elif len(self.final_list) == self.number:
+                    break
+                elif len(self.final_list) % 200 == 0:
+                    parameters['offset'] += 200
 
     def _add_photo_to_list(self, response, list_name):
 
@@ -111,47 +106,36 @@ class TokenForApi:
 
         '''
 
-        # tic = time.perf_counter()
-        if self.number_for_bur <= 200:
-            items = self.number_for_bur
-        else:
-            items = 200
-            self.number_for_bur -= 200
-        print("Получение списка фотографий:")
-        with alive_bar(items, force_tty=True) as bar:
-            for i in response['response']['items']:
-                name_file = i['sizes'][-1]['url'].split('/')[-1].split('?')[0]
-                index = name_file.find('.')
-                name_file = name_file[index:]
-                name_file = f'{i["likes"]["count"]}{name_file}'
-                while True:
-                    if name_file in list_name:
-                        name = name_file.find('(')
-                        if name == -1:
-                            name_file = name_file.split('.')
-                            name_file[0] += '(2)'
-                            name_file = '.'.join(name_file)
-                        else:
-                            name_file = name_file.split('.')
-                            count = int(name_file[0][(
-                                name_file[0].rfind('(')) + 1:-1]) + 1
-                            name_file[0] = str(i["likes"]["count"]) + f'({count})'
-                            name_file = '.'.join(name_file)
+        for i in response['response']['items']:
+            name_file = i['sizes'][-1]['url'].split('/')[-1].split('?')[0]
+            index = name_file.find('.')
+            name_file = name_file[index:]
+            name_file = f'{i["likes"]["count"]}{name_file}'
+            while True:
+                if name_file in list_name:
+                    name = name_file.find('(')
+                    if name == -1:
+                        name_file = name_file.split('.')
+                        name_file[0] += '(2)'
+                        name_file = '.'.join(name_file)
                     else:
-                        self.final_list.append({
-                            'size': i['sizes'][-1]['type'], 
-                            'file_name': name_file,
-                            'photo': {
-                                'likes': i['likes']['count'],
-                                'url': i['sizes'][-1]['url']}})
-                        list_name.append(name_file)
-                        bar()
-                        break
-                if len(self.final_list) == self.number:
+                        name_file = name_file.split('.')
+                        count = int(name_file[0][(
+                            name_file[0].rfind('(')) + 1:-1]) + 1
+                        name_file[0] = str(i["likes"]["count"]) + f'({count})'
+                        name_file = '.'.join(name_file)
+                else:
+                    self.final_list.append({
+                        'size': i['sizes'][-1]['type'], 
+                        'file_name': name_file,
+                        'photo': {
+                            'likes': i['likes']['count'],
+                            'url': i['sizes'][-1]['url']}})
+                    list_name.append(name_file)
                     break
-            # toc = time.perf_counter()
-            # print(f"Вычисление заняло {toc - tic:0.4f} секунд")
-            return list_name
+            if len(self.final_list) == self.number:
+                    break
+        return list_name
 
     def save_photos_to_yandex(self, object_list):
 
@@ -219,8 +203,8 @@ def input_id_and_token():
 
 if __name__ == '__main__':
     id_user, token_yandex = input_id_and_token()
-    object = TokenForApi(token_yandex, 'all')
+    object = TokenForApi(token_yandex, 566)
     object.get_photos_to_vk(id_user)
-    # object.save_photos_to_yandex(object.final_list)
+    object.save_photos_to_yandex(object.final_list)
     # print("\n Список файлов:\n", object)
     
