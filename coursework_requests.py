@@ -1,3 +1,5 @@
+import numbers
+from pprint import pprint
 import requests
 import time
 from alive_progress import alive_bar
@@ -28,6 +30,7 @@ class TokenForApi:
         self.token_yandex = token
         self.number = number
         self.final_list = []
+        self.number_for_bur = number
 
         self.params_vk = {
             'access_token': self.token_vk,
@@ -68,15 +71,22 @@ class TokenForApi:
             'photo_sizes': 1}
         list_name = []
 
-        
         while True:
+            # tic = time.perf_counter()
+
             response = requests.get(url, params={
                 **self.params_vk, **parameters}).json()
-            time.sleep(0.4)
+            time.sleep(0.33)
             if 'error' in response:
                 print(
                     '\nВнимание!!! Ошибка запроса Api VK: ', 
                     response['error']['error_msg'], end='\n\n')
+
+            if self.number_for_bur == 'all':
+                self.number_for_bur = response['response']['count']
+
+            # toc = time.perf_counter()
+            # print(f"Вычисление заняло {toc - tic:0.4f} секунд")
 
             list_name = self._add_photo_to_list(response, list_name) 
 
@@ -100,8 +110,15 @@ class TokenForApi:
         в словарь и добавляются в поле класса final_list. 
 
         '''
+
+        # tic = time.perf_counter()
+        if self.number_for_bur <= 200:
+            items = self.number_for_bur
+        else:
+            items = 200
+            self.number_for_bur -= 200
         print("Получение списка фотографий:")
-        with alive_bar(len(response['response']['items']), force_tty=True) as bar:
+        with alive_bar(items, force_tty=True) as bar:
             for i in response['response']['items']:
                 name_file = i['sizes'][-1]['url'].split('/')[-1].split('?')[0]
                 index = name_file.find('.')
@@ -130,9 +147,11 @@ class TokenForApi:
                         list_name.append(name_file)
                         bar()
                         break
-    
                 if len(self.final_list) == self.number:
                     break
+            # toc = time.perf_counter()
+            # print(f"Вычисление заняло {toc - tic:0.4f} секунд")
+            return list_name
 
     def save_photos_to_yandex(self, object_list):
 
@@ -148,10 +167,11 @@ class TokenForApi:
         name_folder = self.create_folder()
 
         print("Загрузка фотографий на Yandex:")
-        with alive_bar(len(object_list), force_tty=True) as bar:
+        with alive_bar(len(object_list), force_tty=True, dual_line=True) as bar:
             for element in object_list:
                 name_path = name_folder + '/' + element['file_name']
                 parameters = {'path': name_path, 'overwrite': 'true'}
+                bar.text = f'Download {name_path}, please wait ...'
 
                 response = requests.get(
                     url, headers=self.headers_yandex, params=parameters).json()
@@ -201,6 +221,6 @@ if __name__ == '__main__':
     id_user, token_yandex = input_id_and_token()
     object = TokenForApi(token_yandex, 'all')
     object.get_photos_to_vk(id_user)
-    object.save_photos_to_yandex(object.final_list)
-    print("\n Список файлов:\n", object)
+    # object.save_photos_to_yandex(object.final_list)
+    # print("\n Список файлов:\n", object)
     
