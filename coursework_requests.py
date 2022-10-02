@@ -10,13 +10,11 @@ class TokenForApi:
 
     URL = 'https://api.vk.com/method/'
 
-    def __init__(self, token, number=5, version='5.194'):
+    def __init__(self, token, version='5.194'):
 
         '''Конструктор класса. На вход получает токен для работы с 
         
-        Yandex, версию Api для VK (по умолчанию версия 5.194) и 
-
-        количество фотографий для загрузки (по умолчанию 5). Конструктор
+        Yandex, версию Api для VK (по умолчанию версия 5.194). Конструктор
 
         считывает токен для Api VK из файла token_vk.txt.
         
@@ -25,9 +23,7 @@ class TokenForApi:
         with open('token_vk.txt') as file:
             self.token_vk = file.readline()
         self.token_yandex = token
-        self.number = number
         self.final_list = []
-        self.number_for_bur = number
 
         self.params_vk = {
             'access_token': self.token_vk,
@@ -45,7 +41,7 @@ class TokenForApi:
         my_str += '}]\n'
         return my_str
 
-    def get_all_photos(self, id=None):
+    def get_all_photos(self, id=None, count=5):
 
         '''Метод на вход получает номер ID пользователя (по умолчанию
         
@@ -68,8 +64,8 @@ class TokenForApi:
             'photo_sizes': 1}
         list_name = []
 
-        items = int(self.number_for_bur / 200)
-        if self.number_for_bur % 200 != 0:
+        items = int(count / 200)
+        if count % 200 != 0:
             items += 1
         print("Получение списка фотографий:")
         with alive_bar(items, force_tty=True) as bar:
@@ -83,17 +79,17 @@ class TokenForApi:
                         '\nВнимание!!! Ошибка запроса Api VK: ', 
                         response['error']['error_msg'], end='\n\n')
 
-                list_name = self._add_photo_to_list(response, list_name) 
+                list_name = self._add_photo_to_list(response, list_name, count) 
                 bar()
 
                 if len(self.final_list) == response['response']['count']:
                     break
-                elif len(self.final_list) == self.number:
+                elif len(self.final_list) == count:
                     break
                 elif len(self.final_list) % 200 == 0:
                     parameters['offset'] += 200
 
-    def _add_photo_to_list(self, response, list_name):
+    def _add_photo_to_list(self, response, list_name, count_i):
 
         '''Метод на вход получает json объект из которого достается url
         
@@ -133,8 +129,8 @@ class TokenForApi:
                         'url': i['sizes'][-1]['url']})
                     list_name.append(name_file)
                     break
-            if len(self.final_list) == self.number:
-                    break
+            if len(self.final_list) == count_i:
+                break
         return list_name
 
     def get_list_albums(self, id=None):
@@ -290,13 +286,13 @@ def input_id_and_token():
 
 if __name__ == '__main__':
     id_user, token_yandex = input_id_and_token()
-    object = TokenForApi(token_yandex, 456)
-    object.get_all_photos(id_user)
-    object.save_photos_to_yandex(object.final_list)
+    object = TokenForApi(token_yandex)
+    # object.get_all_photos(id_user, 450)
+    # object.save_photos_to_yandex(object.final_list)
     # print("\n Список файлов:\n", object)
     # obj_1 = object.get_list_albums(id_user)
     # pprint.pprint(obj_1)
-    # obj_2 = object.get_photos(id_user, 275293270, 56)
+    obj_2 = object.get_photos(id_user, 275293270, 56)
     # pprint.pprint(obj_2)
-    # object.save_photos_to_yandex(obj_2)
+    object.save_photos_to_yandex(obj_2)
     
