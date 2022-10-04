@@ -23,7 +23,6 @@ class TokenForApi:
         with open('token_vk.txt') as file:
             self.token_vk = file.readline()
         self.token_yandex = token
-        self.final_list = []
 
         self.params_vk = {
             'access_token': self.token_vk,
@@ -32,106 +31,6 @@ class TokenForApi:
         self.headers_yandex = {
             'Content-Type': 'application/json',
             'Authorization': f'OAuth {self.token_yandex}'}
-
-    def __str__(self):
-        my_str = '[{\n'
-        for i in self.final_list:
-            my_str += f'"file_name": "{i["file_name"]}",\n'
-            my_str += f'"size": "{i["size"]}"\n'
-        my_str += '}]\n'
-        return my_str
-
-    def get_all_photos(self, id=None, count=5):
-
-        '''Метод на вход получает номер ID пользователя (по умолчанию
-        
-        None, текущий пользователь). Метод реализует get запрос на 
-        
-        Api VK для получения всех фотографий пользователя или указанного
-        
-        количества. Данные о фотографии (имя, размер, url и likes) 
-        
-        добавляются в словарь. Словари добавляются в поле final_list.
-        
-        '''
-
-        url = TokenForApi.URL + 'photos.getAll?'
-        parameters = {
-            'owner_id': id ,
-            'extended': 1,
-            'offset': 0,
-            'count': 200,
-            'photo_sizes': 1}
-        list_name = []
-
-        items = int(count / 200)
-        if count % 200 != 0:
-            items += 1
-        print("Получение списка фотографий:")
-        with alive_bar(items, force_tty=True) as bar:
-            while True:                 
-                response = requests.get(url, params={
-                    **self.params_vk, **parameters}).json()
-                time.sleep(0.33)
-        
-                if 'error' in response:
-                    print(
-                        '\nВнимание!!! Ошибка запроса Api VK: ', 
-                        response['error']['error_msg'], end='\n\n')
-
-                list_name = self._add_photo_to_list(response, list_name, count) 
-                bar()
-
-                if len(self.final_list) == response['response']['count']:
-                    break
-                elif len(self.final_list) == count:
-                    break
-                elif len(self.final_list) % 200 == 0:
-                    parameters['offset'] += 200
-
-    def _add_photo_to_list(self, response, list_name, count_i):
-
-        '''Метод на вход получает json объект из которого достается url
-        
-        фотографии, определяется максимальный размер, расширение файла,
-        
-        добавляется имя на основе likes фотографии. Проводится проверка
-        
-        на наличие одинаковых имен. Данные на фотографии объединяются 
-        
-        в словарь и добавляются в поле класса final_list. 
-
-        '''
-
-        for i in response['response']['items']:
-            name_file = i['sizes'][-1]['url'].split('/')[-1].split('?')[0]
-            index = name_file.find('.')
-            name_file = name_file[index:]
-            name_file = f'{i["likes"]["count"]}{name_file}'
-            while True:
-                if name_file in list_name:
-                    name = name_file.find('(')
-                    if name == -1:
-                        name_file = name_file.split('.')
-                        name_file[0] += '(2)'
-                        name_file = '.'.join(name_file)
-                    else:
-                        name_file = name_file.split('.')
-                        count = int(name_file[0][(
-                            name_file[0].rfind('(')) + 1:-1]) + 1
-                        name_file[0] = str(i["likes"]["count"]) + f'({count})'
-                        name_file = '.'.join(name_file)
-                else:
-                    self.final_list.append({
-                        'size': i['sizes'][-1]['type'], 
-                        'file_name': name_file,
-                        'likes': i['likes']['count'],
-                        'url': i['sizes'][-1]['url']})
-                    list_name.append(name_file)
-                    break
-            if len(self.final_list) == count_i:
-                break
-        return list_name
 
     def get_list_albums(self, id=None):
 
@@ -156,7 +55,7 @@ class TokenForApi:
             list_albums.append(new_dict)
         return list_albums
 
-    def get_photos(self, id, id_album, count=5):
+    def get_photos(self, id_user, id_album, count=5):
         
         '''На вход получает id пользователя, id альбома, количество
         
@@ -166,19 +65,32 @@ class TokenForApi:
         
         '''
 
+        def _my_dict(album_id, file_name, type, url, sizes=None,):
+            _dict = {}
+            _dict['album_id'] = album_id
+            _dict['int_sizes'] = sizes
+            _dict['file_name'] = file_name
+            _dict['sizes'] = type
+            _dict['url'] = url
+            return _dict
+
         url = TokenForApi.URL + 'photos.get?'
         parameters = {
-            'owner_id': id,
+            'owner_id': id_user,
             'album_id': id_album,
             'extended': 1,
             'photo_sizes': 1,
             'count': count}  
-        list_photos = []
-        list_name = [] 
+        list_photos = [] 
 
         response = requests.get(url, params={
             **self.params_vk, **parameters}).json()
         time.sleep(0.33)
+
+        if 'error' in response:
+            print(
+                '\nВнимание!!! Ошибка запроса Api VK: ', 
+                response['error']['error_msg'], end='\n\n')
 
         for element in response['response']['items']:
             new_dict = {}
@@ -187,29 +99,24 @@ class TokenForApi:
                     sizes = i['width'] / i['height']
                     if 'int_sizes' in new_dict:
                         if sizes > new_dict['int_sizes']:
-                            new_dict['album_id'] = element['album_id']
-                            new_dict['int_sizes'] = sizes
-                            new_dict['file_name'] = self.create_name_file(
-                                element['likes']['count'], i['url']
+                            new_dict = _my_dict(
+                                album_id=element['album_id'], sizes=sizes,
+                                file_name=self.create_name_file(element['likes']['count'], i['url']),
+                                type=i['type'], url=i['url']
                                 )
-                            new_dict['sizes'] = i['type']
-                            new_dict['url'] = i['url']
                     else:
-                        new_dict['album_id'] = element['album_id']
-                        new_dict['int_sizes'] = sizes
-                        new_dict['file_name'] = self.create_name_file(
-                                element['likes']['count'], i['url']
+                        new_dict = _my_dict(
+                                album_id=element['album_id'], sizes=sizes,
+                                file_name=self.create_name_file(element['likes']['count'], i['url']),
+                                type=i['type'], url=i['url']
                                 )
-                        new_dict['sizes'] = i['type']
-                        new_dict['url'] = i['url']
                     del new_dict['int_sizes']
                 else:
-                    new_dict['album_id'] = element['album_id']
-                    new_dict['file_name'] = self.create_name_file(
-                        element['likes']['count'], i['url']
+                    new_dict = _my_dict(
+                        album_id=element['album_id'], type=i['type'],
+                        file_name=self.create_name_file(element['likes']['count'], i['url']),
+                        url=i['url']
                         )
-                    new_dict['sizes'] = i['type']
-                    new_dict['url'] = i['url']
             list_photos.append(new_dict)
         return list_photos
 
@@ -237,14 +144,13 @@ class TokenForApi:
         with alive_bar(len(list_objects), force_tty=True, dual_line=True) as bar:
             for element in list_objects:
                 name_path = name_folder + '/' + element['file_name']
-                parameters = {'path': name_path, 'overwrite': 'true'}
+                parameters = {
+                    'path': name_path, 
+                    'url': element['url']}
                 bar.text = f'Download {name_path}, please wait ...'
 
-                response = requests.get(
-                    url, headers=self.headers_yandex, params=parameters).json()
-                response = requests.put(
-                    response['href'], files={'file': element['url']}, 
-                    headers=self.headers_yandex, params=parameters)
+                response = requests.post(
+                    url, headers=self.headers_yandex, params=parameters)
                 bar()
 
     def create_folder(self):
@@ -287,12 +193,9 @@ def input_id_and_token():
 if __name__ == '__main__':
     id_user, token_yandex = input_id_and_token()
     object = TokenForApi(token_yandex)
-    # object.get_all_photos(id_user, 450)
-    # object.save_photos_to_yandex(object.final_list)
-    # print("\n Список файлов:\n", object)
-    # obj_1 = object.get_list_albums(id_user)
+    obj_1 = object.get_list_albums(id_user)
     # pprint.pprint(obj_1)
-    obj_2 = object.get_photos(id_user, 275293270, 56)
-    # pprint.pprint(obj_2)
+    obj_2 = object.get_photos(id_user, 275293270)
+    pprint.pprint(obj_2)
     object.save_photos_to_yandex(obj_2)
     
