@@ -32,7 +32,7 @@ class TokenForApi:
             'Content-Type': 'application/json',
             'Authorization': f'OAuth {self.token_yandex}'}
 
-    def get_list_albums(self, id=None):
+    def get_list_albums(self, id_user=None):
 
         '''На вход получает id пользователя. Возвращает список
         
@@ -41,7 +41,7 @@ class TokenForApi:
         '''
 
         url = TokenForApi.URL + 'photos.getAlbums?'
-        parameters = {'owner_id': id}  
+        parameters = {'owner_id': id_user}  
         list_albums = []  
 
         response = requests.get(url, params={
@@ -55,17 +55,20 @@ class TokenForApi:
             list_albums.append(new_dict)
         return list_albums
 
-    def get_photos(self, id_user, id_album, count=5):
+    def get_photos(self, id_user, id_album='profile', count=5):
         
         '''На вход получает id пользователя, id альбома, количество
         
-        фотографий (по умолчанию 5). Возвращает список фотографий 
+        фотографий (по умолчанию 5). Возвращает список словарей по
         
-        из альбома.
+        каждой фотографии из альбома (json объект).
         
         '''
 
-        def _my_dict(album_id, file_name, type, url, sizes=None,):
+        def _my_dict(album_id, file_name, type, url, sizes=None):
+
+            '''Возвращает словарь с переданными аргументами'''
+
             _dict = {}
             _dict['album_id'] = album_id
             _dict['int_sizes'] = sizes
@@ -131,9 +134,9 @@ class TokenForApi:
 
         '''Метод принимает список словарей с данными на фотографии.
         
-        Осуществляет get и put запрос на Api Yandex. Загружает 
+        Осуществляет post запрос на Api Yandex. Загружает 
         
-        фотографии по ссылкам на Yandex.
+        фотографии по ссылкам из списка словарей на Yandex.
         
         '''
 
@@ -146,11 +149,14 @@ class TokenForApi:
                 name_path = name_folder + '/' + element['file_name']
                 parameters = {
                     'path': name_path, 
-                    'url': element['url']}
+                    'url': element['url']
+                    }
                 bar.text = f'Download {name_path}, please wait ...'
 
                 response = requests.post(
                     url, headers=self.headers_yandex, params=parameters)
+                time.sleep(0.4)
+                
                 bar()
 
     def create_folder(self):
@@ -175,7 +181,7 @@ def input_id_and_token():
     
     токена с полигона Yandex (при вводе пустого поля, токен считывается
     
-    из файла token_yandex.txt.)
+    из файла token_yandex.txt)
 
     '''
 
@@ -193,9 +199,9 @@ def input_id_and_token():
 if __name__ == '__main__':
     id_user, token_yandex = input_id_and_token()
     object = TokenForApi(token_yandex)
-    obj_1 = object.get_list_albums(id_user)
+    # obj_1 = object.get_list_albums(id_user)
     # pprint.pprint(obj_1)
-    obj_2 = object.get_photos(id_user, 275293270)
-    pprint.pprint(obj_2)
+    obj_2 = object.get_photos(id_user, count=10)
     object.save_photos_to_yandex(obj_2)
+    
     
