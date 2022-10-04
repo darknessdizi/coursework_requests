@@ -89,11 +89,12 @@ class TokenForApi:
             new_dict['sizes'] = element['sizes'][-1]['type']
             new_dict['url'] = element['sizes'][-1]['url']
             new_dict['likes'] = element['likes']['count']
+            new_dict['album_id'] = element['album_id']
                 
             list_photos.append(new_dict)
         return list_photos
 
-    def create_name_file(self, dict_photo, list_name):
+    def create_name_file(self, dict_photo, list_names):
 
         '''На вход получает словарь с данными на фотографию и список
 
@@ -107,13 +108,13 @@ class TokenForApi:
         name_file = name_file[index:]
         name_file = str(dict_photo['likes']) + name_file
 
-        if name_file in list_name:
+        if name_file in list_names:
             name = name_file.split('.')
             local_time = f'_({time.time()})'
             name[0] += local_time
             name_file = '.'.join(name)
         
-        list_name.append(name_file)
+        list_names.append(name_file)
         return name_file
 
     def save_photos_to_yandex(self, list_photos):
@@ -131,13 +132,13 @@ class TokenForApi:
         '''
 
         url = 'https://cloud-api.yandex.net/v1/disk/resources/upload'
-        name_folder = self.create_folder()
-        list_name = []
+        list_names = []
 
-        print("Загрузка фотографий на Yandex:")
+        print("Загрузка фотографий из альбома на Yandex:")
         with alive_bar(len(list_photos), force_tty=True, dual_line=True) as bar:
             for element in list_photos:
-                name_file = self.create_name_file(element, list_name)
+                name_folder = self.create_folder(element['album_id'])
+                name_file = self.create_name_file(element, list_names)
                 name_path = name_folder + '/' + name_file
                 parameters = {
                     'path': name_path, 
@@ -153,7 +154,7 @@ class TokenForApi:
                 bar()
         return list_photos
 
-    def create_folder(self):
+    def create_folder(self, id_album):
 
         '''Метод класса создает папку на Yandex диск с именем текущей
         
@@ -164,7 +165,8 @@ class TokenForApi:
         url = 'https://cloud-api.yandex.net/v1/disk/resources' 
         name_folders = list(time.gmtime()[0:3])[::-1]
         name_folders = '.'.join(list(map(str, name_folders)))
-        parameters = {'path': name_folders, 'overwrite': 'false'}
+        name_folders += '_' + str(id_album)
+        parameters = {'path': name_folders}
         requests.put(url, headers=self.headers_yandex, params=parameters)
         return name_folders
 
@@ -192,16 +194,13 @@ def input_id_and_token():
 if __name__ == '__main__':
     id_user, token_yandex = input_id_and_token()
     object = TokenForApi(token_yandex)
-    # my_albums = object.get_list_albums(id_user)
+    my_albums = object.get_list_albums(id_user)
     # pprint.pprint(my_albums)
-    my_photo = object.get_photos(id_user, count=50)
+    # my_photo = object.get_photos(id_user, count=15)
     # pprint.pprint(my_photo)
-    c = object.save_photos_to_yandex(my_photo)
+    # c = object.save_photos_to_yandex(my_photo)
     # pprint.pprint(c)
-    # t = 1
-    # for i in c:
-    #     print(f'Photo: {t}', i['file_name'])
-    #     t += 1
-    
-    
+    for element in my_albums:
+        my_photo = object.get_photos(id_user, element['id'], 10)
+        object.save_photos_to_yandex(my_photo)
     
