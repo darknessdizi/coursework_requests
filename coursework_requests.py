@@ -183,8 +183,9 @@ def input_id_and_token():
 
     id_user = input("Введите ID пользователя: ")
     if id_user == '':
-        # id_user = None
-        id_user = 2726270
+        id_user = None
+        # id_user = 2726270
+        # id_user = 20272794
     token_yandex = input("Введите token с полигона Yandex: ")
     if token_yandex == '':
         with open('token_yandex.txt') as file:
@@ -194,13 +195,6 @@ def input_id_and_token():
 if __name__ == '__main__':
     id_user, token_yandex = input_id_and_token()
     object = TokenForApi(token_yandex)
-    my_albums = object.get_list_albums(id_user)
-    # pprint.pprint(my_albums)
-    # my_photo = object.get_photos(id_user, count=15)
-    # pprint.pprint(my_photo)
-    # c = object.save_photos_to_yandex(my_photo)
-    # pprint.pprint(c)
-    for element in my_albums:
-        my_photo = object.get_photos(id_user, element['id'], 10)
-        object.save_photos_to_yandex(my_photo)
+    my_photo = object.get_photos(id_user, count=10)
+    object.save_photos_to_yandex(my_photo)
     
