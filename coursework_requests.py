@@ -2,45 +2,38 @@ import requests
 import time
 from alive_progress import alive_bar
 import pprint
+import json
 
 
-class TokenForApi:
+class Uploader:
 
-    '''Класс для работы с Api VK и Api Yandex'''
+    '''Класс для работы с Api VK'''
 
     URL = 'https://api.vk.com/method/'
 
-    def __init__(self, token, version='5.194'):
+    def __init__(self, version='5.194'):
 
-        '''Конструктор класса. На вход получает токен для работы с 
-        
-        Yandex, версию Api для VK (по умолчанию версия 5.194). Конструктор
-
-        считывает токен для Api VK из файла token_vk.txt.
+        '''Конструктор класса. На вход получает версию Api для VK
+        (по умолчанию версия 5.194). Конструктор считывает токен 
+        для Api VK из файла token_vk.txt.
         
         '''
 
         with open('token_vk.txt') as file:
             self.token_vk = file.readline()
-        self.token_yandex = token
 
         self.params_vk = {
             'access_token': self.token_vk,
             'v': version}
 
-        self.headers_yandex = {
-            'Content-Type': 'application/json',
-            'Authorization': f'OAuth {self.token_yandex}'}
-
     def get_list_albums(self, id_user=None):
 
         '''На вход получает id пользователя. Возвращает список
-        
         альбомов, содержащий id альбома и его размер.
         
         '''
 
-        url = TokenForApi.URL + 'photos.getAlbums?'
+        url = Uploader.URL + 'photos.getAlbums?'
         parameters = {'owner_id': id_user}  
         list_albums = []  
 
@@ -58,14 +51,12 @@ class TokenForApi:
     def get_photos(self, id_user, id_album='profile', count=5):
         
         '''На вход получает id пользователя, id альбома, количество
-        
         фотографий (по умолчанию 5). Возвращает список словарей по
-        
         каждой фотографии из альбома (json объект).
         
         '''
 
-        url = TokenForApi.URL + 'photos.get?'
+        url = Uploader.URL + 'photos.get?'
         parameters = {
             'owner_id': id_user,
             'album_id': id_album,
@@ -94,12 +85,60 @@ class TokenForApi:
             list_photos.append(new_dict)
         return list_photos
 
+class DownloaderYandex:
+
+    '''Класс для работы с Api Yandex'''
+
+    def __init__(self, token):
+
+        '''Конструктор класса. На вход получает токен для работы 
+        с Yandex.
+        
+        '''
+
+        self.token_yandex = token
+
+        self.headers_yandex = {
+            'Content-Type': 'application/json',
+            'Authorization': f'OAuth {self.token_yandex}'}
+
+    def save_photos_to_yandex(self, list_photos):
+
+        '''Метод принимает список словарей с данными на фотографии.
+        Осуществляет post запрос на Api Yandex. Создает имена файлов
+        и загружает фотографии по ссылкам из списка словарей на Yandex.
+        Возвращает json объект (имя файла и его размер). Реализован 
+        прогресс бар.
+        
+        '''
+
+        url = 'https://cloud-api.yandex.net/v1/disk/resources/upload'
+        list_names = []
+
+        print("Загрузка фотографий на Yandex:")
+        with alive_bar(len(list_photos), force_tty=True, dual_line=True) as bar:
+            for element in list_photos:
+                name_folder = self.create_folder(element['album_id'])
+                name_file = self.create_name_file(element, list_names)
+                name_path = name_folder + '/' + name_file
+                parameters = {
+                    'path': name_path, 
+                    'url': element['url']
+                    }
+                bar.text = f'Download {name_path}, please wait ...'
+
+                response = requests.post(
+                    url, headers=self.headers_yandex, params=parameters)
+            
+                del element['likes'], element['url'], element['album_id']
+                element['file_name'] = name_file
+                bar()
+        return list_photos
+
     def create_name_file(self, dict_photo, list_names):
 
         '''На вход получает словарь с данными на фотографию и список
-
         уже занятых имен. Создает уникальное имя файла и добавляет его
-        
         в список занятых имен. Возвращает уникальное имя для файла.
         
         '''
@@ -117,47 +156,9 @@ class TokenForApi:
         list_names.append(name_file)
         return name_file
 
-    def save_photos_to_yandex(self, list_photos):
-
-        '''Метод принимает список словарей с данными на фотографии.
-        
-        Осуществляет post запрос на Api Yandex. Создает имена файлов
-        
-        и загружает фотографии по ссылкам из списка словарей на Yandex.
-
-        Возвращает json объект (имя файла и его размер). Реализован 
-
-        прогресс бар.
-        
-        '''
-
-        url = 'https://cloud-api.yandex.net/v1/disk/resources/upload'
-        list_names = []
-
-        print("Загрузка фотографий из альбома на Yandex:")
-        with alive_bar(len(list_photos), force_tty=True, dual_line=True) as bar:
-            for element in list_photos:
-                name_folder = self.create_folder(element['album_id'])
-                name_file = self.create_name_file(element, list_names)
-                name_path = name_folder + '/' + name_file
-                parameters = {
-                    'path': name_path, 
-                    'url': element['url']
-                    }
-                bar.text = f'Download {name_path}, please wait ...'
-
-                response = requests.post(
-                    url, headers=self.headers_yandex, params=parameters)
-            
-                del element['likes'], element['url']
-                element['file_name'] = name_file
-                bar()
-        return list_photos
-
     def create_folder(self, id_album):
 
         '''Метод класса создает папку на Yandex диск с именем текущей
-        
         даты.
         
         '''
@@ -174,17 +175,15 @@ class TokenForApi:
 def input_id_and_token():
 
     '''Функция реализует пользовательский ввод номера ID профиля и 
-    
     токена с полигона Yandex (при вводе пустого поля, токен считывается
-    
-    из файла token_yandex.txt)
+    из файла token_yandex.txt).
 
     '''
 
     id_user = input("Введите ID пользователя: ")
     if id_user == '':
-        id_user = None
-        # id_user = 2726270
+        # id_user = None
+        id_user = 2726270
         # id_user = 20272794
     token_yandex = input("Введите token с полигона Yandex: ")
     if token_yandex == '':
@@ -194,7 +193,14 @@ def input_id_and_token():
 
 if __name__ == '__main__':
     id_user, token_yandex = input_id_and_token()
-    object = TokenForApi(token_yandex)
-    my_photo = object.get_photos(id_user, count=10)
-    object.save_photos_to_yandex(my_photo)
+
+    object_vk = Uploader()
+    my_photos = object_vk.get_photos(id_user, count=10)
+
+    object_yandex = DownloaderYandex(token_yandex)
+    my_json = object_yandex.save_photos_to_yandex(my_photos)
+
+    str_reader = json.dumps(my_json, ensure_ascii=False, indent=4)
+    with open('list_files.json', 'w', encoding='utf-8') as f:
+        f.write(str_reader)
     
